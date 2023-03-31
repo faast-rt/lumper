@@ -392,11 +392,17 @@ impl VMM {
 
         self.epoll.add_fd(listener.as_raw_fd()).unwrap();
 
-        let stdin = io::stdin();
-        let stdin_lock = stdin.lock();
-        stdin_lock
-            .set_raw_mode()
-            .map_err(Error::TerminalConfigure)?;
+        let stdin_lock = if !no_console {
+            let stdin = io::stdin();
+            let stdin_lock = stdin.lock();
+            stdin_lock
+                .set_raw_mode()
+                .map_err(Error::TerminalConfigure)?;
+            Some(stdin_lock)
+        } else {
+            None
+        };
+
         let mut events = vec![epoll::Event::new(epoll::Events::empty(), 0); EPOLL_EVENTS_LEN];
         let epoll_fd = self.epoll.as_raw_fd();
         let interface_fd = match self.virtio_net.as_ref() {
@@ -419,10 +425,14 @@ impl VMM {
             for event in events.iter().take(num_events) {
                 let event_data = event.data as RawFd;
 
-                if let libc::STDIN_FILENO = event_data {
+                if event_data == libc::STDIN_FILENO && stdin_lock.as_ref().is_some() {
                     let mut out = [0u8; 64];
 
-                    let count = stdin_lock.read_raw(&mut out).map_err(Error::StdinRead)?;
+                    let count = stdin_lock
+                        .as_ref()
+                        .unwrap()
+                        .read_raw(&mut out)
+                        .map_err(Error::StdinRead)?;
 
                     self.serial
                         .lock()
