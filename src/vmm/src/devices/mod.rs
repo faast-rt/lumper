@@ -12,8 +12,7 @@ pub struct Writer {
 
 impl Write for Writer {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
-        let s = String::from_utf8_lossy(buf).to_string();
-        let _ = &self.unix_stream.write(s.as_bytes()).unwrap();
+        let _ = &self.unix_stream.write(buf).unwrap();
 
         Ok(buf.len())
     }

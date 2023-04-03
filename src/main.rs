@@ -1,7 +1,7 @@
-use std::{io::Read, os::unix::net::UnixListener, path::Path, thread::sleep, u32};
+use std::{io::Read, os::unix::net::UnixListener, path::Path, u32};
 
 use clap::Parser;
-use vmm::{devices::Writer, VMM};
+use vmm::{VMM};
 
 #[derive(Parser)]
 #[clap(version = "0.1", author = "Polytech Montpellier - DevOps")]
@@ -60,8 +60,6 @@ fn main() -> Result<(), Error> {
         if std::fs::metadata(path).is_ok() {
             std::fs::remove_file(path).unwrap();
         }
-
-        println!("Socket path: {}", path.to_str().unwrap());
 
         let unix_listener = UnixListener::bind(path).unwrap();
 

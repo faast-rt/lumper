@@ -273,20 +273,10 @@ impl VMM {
         disable_console: bool,
         is_socket: bool,
     ) -> Result<()> {
-        if disable_console {
-            return Ok(());
-        }
-
-        self.cmdline
-            .insert_str("console=ttyS0")
-            .map_err(Error::Cmdline)?;
 
         if let Some(console_path) = console_path {
             if is_socket {
-                println!("Connecting to socket: {}", console_path);
                 let unix_stream = UnixStream::connect(console_path).unwrap();
-
-                // create writer
 
                 let writer = Writer::new(unix_stream);
                 let mut serial = self.serial.lock().unwrap();
@@ -300,6 +290,14 @@ impl VMM {
                 *serial = LumperSerial::new(Box::new(file)).map_err(Error::SerialCreation)?;
             }
         }
+
+        if disable_console {
+            return Ok(());
+        }
+
+        self.cmdline
+            .insert_str("console=ttyS0")
+            .map_err(Error::Cmdline)?;
 
         Ok(())
     }
