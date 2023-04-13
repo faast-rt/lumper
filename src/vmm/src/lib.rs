@@ -270,29 +270,23 @@ impl VMM {
     pub fn configure_console(
         &mut self,
         console_path: Option<String>,
-        disable_console: bool,
-        is_socket: bool,
+        socket_path: Option<String>,
     ) -> Result<()> {
-
         if let Some(console_path) = console_path {
-            if is_socket {
-                let unix_stream = UnixStream::connect(console_path).unwrap();
+            // We create the file if it does not exist, else we open
+            let file = File::create(&console_path).map_err(Error::ConsoleError)?;
 
-                let writer = Writer::new(unix_stream);
-                let mut serial = self.serial.lock().unwrap();
-
-                *serial = LumperSerial::new(Box::new(writer)).map_err(Error::SerialCreation)?;
-            } else {
-                // We create the file if it does not exist, else we open
-                let file = File::create(&console_path).map_err(Error::ConsoleError)?;
-
-                let mut serial = self.serial.lock().unwrap();
-                *serial = LumperSerial::new(Box::new(file)).map_err(Error::SerialCreation)?;
-            }
+            let mut serial = self.serial.lock().unwrap();
+            *serial = LumperSerial::new(Box::new(file)).map_err(Error::SerialCreation)?;
         }
 
-        if disable_console {
-            return Ok(());
+        if let Some(socket_path) = socket_path {
+            let unix_stream = UnixStream::connect(socket_path).unwrap();
+
+            let writer = Writer::new(unix_stream);
+            let mut serial = self.serial.lock().unwrap();
+
+            *serial = LumperSerial::new(Box::new(writer)).map_err(Error::SerialCreation)?;
         }
 
         self.cmdline
@@ -469,12 +463,11 @@ impl VMM {
         mem_size_mb: u32,
         kernel_path: &str,
         console: Option<String>,
-        no_console: bool,
         initramfs_path: Option<String>,
         if_name: Option<String>,
-        is_socket: bool,
+        socket_path: Option<String>,
     ) -> Result<()> {
-        self.configure_console(console, no_console, is_socket)?;
+        self.configure_console(console, socket_path)?;
         self.configure_memory(mem_size_mb)?;
         self.load_default_cmdline()?;
 

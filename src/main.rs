@@ -1,7 +1,7 @@
 use std::{io::Read, os::unix::net::UnixListener, path::Path, u32};
 
 use clap::Parser;
-use vmm::{VMM};
+use vmm::VMM;
 
 #[derive(Parser)]
 #[clap(version = "0.1", author = "Polytech Montpellier - DevOps")]
@@ -38,8 +38,9 @@ struct VMMOpts {
     #[clap(long)]
     no_console: bool,
 
+    /// Unix socket path
     #[clap(long)]
-    socket: bool,
+    socket: Option<String>,
 }
 
 #[derive(Debug)]
@@ -54,13 +55,13 @@ pub enum Error {
 fn main() -> Result<(), Error> {
     let opts: VMMOpts = VMMOpts::parse();
 
-    let console = opts.console.unwrap();
-    if opts.socket {
-        let path = Path::new(console.as_str());
-        if std::fs::metadata(path).is_ok() {
-            std::fs::remove_file(path).unwrap();
-        }
+    if opts.console.is_some() && opts.socket.is_some() {
+        println!("You can't use --console and --socket at the same time");
+        return Ok(());
+    }
 
+    if let Some(socket) = opts.socket.as_ref() {
+        let path = Path::new(socket.as_str());
         let unix_listener = UnixListener::bind(path).unwrap();
 
         std::thread::spawn(move || {
@@ -90,8 +91,7 @@ fn main() -> Result<(), Error> {
         opts.cpus,
         opts.memory,
         &opts.kernel,
-        Some(console),
-        opts.no_console,
+        opts.console,
         opts.initramfs,
         opts.net,
         opts.socket,
