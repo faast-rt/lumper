@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause
 
 use std::convert::TryInto;
-use std::fs::File;
-use std::io::{self, Write};
+use std::io::Write;
 use std::os::unix::net::UnixStream;
 use std::sync::{Arc, Mutex};
 use std::{result, u64};
@@ -11,8 +10,7 @@ use std::{result, u64};
 use kvm_bindings::{kvm_fpu, kvm_regs, CpuId};
 use kvm_ioctls::{VcpuExit, VcpuFd, VmFd};
 use vm_device::device_manager::{IoManager, MmioManager};
-use vm_memory::{Address, ByteValued, Bytes, GuestAddress, GuestMemoryError, GuestMemoryMmap};
-use vmm_sys_util::terminal::Terminal;
+use vm_memory::{Address, Bytes, GuestAddress, GuestMemoryError, GuestMemoryMmap};
 
 use crate::devices::serial::{LumperSerial, SERIAL_PORT_BASE, SERIAL_PORT_LAST_REGISTER};
 
@@ -64,7 +62,7 @@ pub type Result<T> = result::Result<T, Error>;
 /// [`vmm-vcpu`](https://github.com/rust-vmm/vmm-vcpu) crate is stabilized.
 pub(crate) struct Vcpu {
     /// Index.
-    pub index: u64,
+    pub _index: u64,
     /// KVM file descriptor for a vCPU.
     pub vcpu_fd: VcpuFd,
 
@@ -81,7 +79,7 @@ impl Vcpu {
         virtio_manager: Arc<Mutex<IoManager>>,
     ) -> Result<Self> {
         Ok(Vcpu {
-            index,
+            _index: index,
             vcpu_fd: vm_fd.create_vcpu(index).map_err(Error::KvmIoctl)?,
             serial,
             virtio_manager,
@@ -239,6 +237,7 @@ impl Vcpu {
                     VcpuExit::Shutdown | VcpuExit::Hlt => {
                         println!("Guest shutdown: {:?}. Bye!", exit_reason);
                         unix_socket.write_all(b"1").unwrap();
+                        break;
                     }
 
                     // This is a PIO write, i.e. the guest is trying to write

@@ -271,6 +271,7 @@ impl VMM {
         &mut self,
         console_path: Option<String>,
         socket_path: Option<String>,
+        no_console: bool,
     ) -> Result<()> {
         if let Some(console_path) = console_path {
             // We create the file if it does not exist, else we open
@@ -289,9 +290,11 @@ impl VMM {
             *serial = LumperSerial::new(Box::new(writer)).map_err(Error::SerialCreation)?;
         }
 
-        self.cmdline
-            .insert_str("console=ttyS0")
-            .map_err(Error::Cmdline)?;
+        if !no_console {
+            self.cmdline
+                .insert_str("console=ttyS0")
+                .map_err(Error::Cmdline)?;
+        }
 
         Ok(())
     }
@@ -446,10 +449,10 @@ impl VMM {
                 }
 
                 if connections.iter().any(|c| c.as_raw_fd() == event_data) {
-                    use vmm_sys_util::signal::Killable;
                     println!("Shutting down");
                     handlers.iter().for_each(|handler| {
-                        handler.kill(9).unwrap();
+                        let thread = handler.thread();
+                        std::thread::Thread::unpark(thread);
                     });
                     return Ok(());
                 }
@@ -466,8 +469,9 @@ impl VMM {
         initramfs_path: Option<String>,
         if_name: Option<String>,
         socket_path: Option<String>,
+        no_console: bool,
     ) -> Result<()> {
-        self.configure_console(console, socket_path)?;
+        self.configure_console(console, socket_path, no_console)?;
         self.configure_memory(mem_size_mb)?;
         self.load_default_cmdline()?;
 

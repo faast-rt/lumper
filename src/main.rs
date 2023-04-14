@@ -95,6 +95,7 @@ fn main() -> Result<(), Error> {
         opts.initramfs,
         opts.net,
         opts.socket,
+        opts.no_console,
     )
     .map_err(Error::VmmConfigure)?;
 
