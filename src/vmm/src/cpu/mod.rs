@@ -271,6 +271,12 @@ impl Vcpu {
                                     .expect("Invalid serial register offset"),
                             );
                         }
+                        0x64 => {
+                            //handle unsupported shutdown
+                            println!("Guest shutdown. Bye!");
+                            unix_socket.write_all(b"1").unwrap();
+                            break;
+                        }
                         _ => {
                             println!("Unsupported device read at {:x?}", addr);
                         }
