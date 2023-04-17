@@ -10,7 +10,7 @@ extern crate vm_superio;
 
 use std::any::Any;
 use std::fs::File;
-use std::io::stdout;
+use std::io::{stdout, Read};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::os::unix::prelude::RawFd;
@@ -106,6 +106,7 @@ pub struct VMM {
     vcpus: Vec<Vcpu>,
 
     serial: Arc<Mutex<LumperSerial>>,
+    socket_stream: Option<Arc<Mutex<UnixStream>>>,
     virtio_manager: Arc<Mutex<IoManager>>,
     virtio_net: Option<Arc<Mutex<VirtioNet<Arc<GuestMemoryMmap>, Tap>>>>,
 
@@ -135,6 +136,7 @@ impl VMM {
             serial: Arc::new(Mutex::new(
                 LumperSerial::new(Box::new(stdout())).map_err(Error::SerialCreation)?,
             )),
+            socket_stream: None,
             virtio_net: None,
             virtio_manager: Arc::new(Mutex::new(IoManager::new())),
             epoll,
@@ -282,7 +284,11 @@ impl VMM {
         }
 
         if let Some(socket_path) = socket_path {
-            let unix_stream = UnixStream::connect(socket_path).unwrap();
+            let unix_stream = Arc::new(Mutex::new(UnixStream::connect(socket_path).unwrap()));
+            self.socket_stream = Some(unix_stream.clone());
+            self.epoll
+                .add_fd(unix_stream.lock().unwrap().as_raw_fd())
+                .unwrap();
 
             let writer = Writer::new(unix_stream);
             let mut serial = self.serial.lock().unwrap();
@@ -404,6 +410,11 @@ impl VMM {
             Some(virtio_net) => Some(virtio_net.lock().unwrap().interface.as_raw_fd()),
             None => None,
         };
+
+        let socket_fd = match self.socket_stream.as_ref() {
+            Some(socket) => Some(socket.lock().unwrap().as_raw_fd()),
+            None => None,
+        };
         // Let's start the STDIN/Network interface polling thread.
         loop {
             let num_events = match epoll::wait(epoll_fd, -1, &mut events[..]) {
@@ -435,6 +446,28 @@ impl VMM {
                         .serial
                         .enqueue_raw_bytes(&out[..count])
                         .map_err(Error::StdinWrite)?;
+                }
+
+                if socket_fd == Some(event_data) {
+                    let mut out = [0u8; 512];
+
+                    let count = self
+                        .socket_stream
+                        .as_ref()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .read(&mut out)
+                        .unwrap();
+
+                    while self
+                        .serial
+                        .lock()
+                        .unwrap()
+                        .serial
+                        .enqueue_raw_bytes(&out[..count])
+                        .is_err()
+                    {}
                 }
 
                 if interface_fd == Some(event_data) {
