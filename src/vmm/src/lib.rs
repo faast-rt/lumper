@@ -461,7 +461,7 @@ impl VMM {
                         .unwrap();
 
                     for c in out.iter().take(count) {
-                        // std::thread::sleep(std::time::Duration::from_millis(1));
+                        std::thread::sleep(std::time::Duration::from_millis(1));
                         let mut buf = [0u8; 1];
                         buf[0] = *c;
                         while self
