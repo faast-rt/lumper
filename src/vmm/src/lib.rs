@@ -460,14 +460,19 @@ impl VMM {
                         .read(&mut out)
                         .unwrap();
 
-                    while self
-                        .serial
-                        .lock()
-                        .unwrap()
-                        .serial
-                        .enqueue_raw_bytes(&out[..count])
-                        .is_err()
-                    {}
+                    for c in out.iter().take(count) {
+                        // std::thread::sleep(std::time::Duration::from_millis(1));
+                        let mut buf = [0u8; 1];
+                        buf[0] = *c;
+                        while self
+                            .serial
+                            .lock()
+                            .unwrap()
+                            .serial
+                            .enqueue_raw_bytes(&buf)
+                            .is_err()
+                        {}
+                    }
                 }
 
                 if interface_fd == Some(event_data) {
