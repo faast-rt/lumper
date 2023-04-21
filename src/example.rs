@@ -2,7 +2,7 @@ use std::{io::Read, os::unix::net::UnixListener, path::Path, u32};
 
 use clap::Parser;
 use log::{debug, error, info};
-use vmm::VMM;
+use lumper::VMM;
 
 #[derive(Parser, Debug)]
 #[clap(version = "0.1", author = "Polytech Montpellier - DevOps")]
@@ -54,11 +54,11 @@ struct VMMOpts {
 
 #[derive(Debug)]
 pub enum Error {
-    VmmNew(vmm::Error),
+    VmmNew(lumper::Error),
 
-    VmmConfigure(vmm::Error),
+    VmmConfigure(lumper::Error),
 
-    VmmRun(vmm::Error),
+    VmmRun(lumper::Error),
 }
 
 fn main() -> Result<(), Error> {

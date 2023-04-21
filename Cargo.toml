@@ -4,7 +4,33 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = {version = "4.1.4", features = ["derive"]}
-vmm = { path = "src/vmm" }
+epoll = "4.3.1"
+kvm-bindings = { version = "0.6.0", features = ["fam-wrappers"] }
+kvm-ioctls = "0.13.0"
+libc = "0.2.91"
+linux-loader = { version = "0.8.1", features = ["bzimage", "elf"] }
+vm-memory = { version = "0.10.0", features = ["backend-mmap"] }
+vmm-sys-util = "0.11.1"
+virtio-bindings = "0.2.0"
+cidr = "0.2.1"
 log = "0.4.17"
+
+# vm-device is not yet published on crates.io.
+# To make sure that breaking changes to vm-device are not breaking the
+# vm-vcpu build, we're using a fixed revision.
+vm-device = { git = "https://github.com/lucido-simon/vm-device", rev = "27537ff920fb6b1f8749294c911648d8e44fd5e5" }
+virtio-device = { git = "https://github.com/rust-vmm/vm-virtio" }
+virtio-queue = { git = "https://github.com/rust-vmm/vm-virtio" }
+
+vm-superio = "0.7.0"
+
+serde_json = "1.0.94"
+serde = { version = "1.0.126", features = ["derive"] }
+
+[[example]]
+name = "lumper"
+path = "src/example.rs"
+
+[dev-dependencies]
+clap = {version = "4.1.4", features = ["derive"]}
 env_logger = "0.10.0"
