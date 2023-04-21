@@ -11,6 +11,7 @@ extern crate vm_superio;
 use std::any::Any;
 use std::fs::File;
 use std::io::{stdout, Read};
+use std::net::Ipv4Addr;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::os::unix::prelude::RawFd;
@@ -19,6 +20,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::{io, path::PathBuf};
 
+use cidr::IpInet;
 use devices::net::tap::Tap;
 use devices::net::VirtioNet;
 use devices::Writer;
@@ -94,6 +96,10 @@ pub enum Error {
     JoinThreadError(Box<dyn Any + Send>),
     /// Writer configuration error
     WriterError(io::Error),
+    /// Not a valid CIDR address
+    InvalidCIDRAddress(cidr::errors::NetworkParseError),
+    /// Not a valid IP address
+    InvalidIPAddress(std::net::AddrParseError),
 }
 
 /// Dedicated [`Result`](https://doc.rust-lang.org/std/result/) type.
@@ -186,7 +192,12 @@ impl VMM {
             .map_err(Error::Cmdline)
     }
     // configure the virtio-net device
-    pub fn configure_net(&mut self, interface: Option<String>) -> Result<()> {
+    pub fn configure_net(
+        &mut self,
+        interface: Option<String>,
+        ip: Option<String>,
+        gateway: Option<String>,
+    ) -> Result<()> {
         let if_name = match interface {
             Some(if_name) => if_name,
             None => return Ok(()),
@@ -229,6 +240,26 @@ impl VMM {
         self.cmdline
             .add_virtio_mmio_device(0x1000, virtio_address, 5, None)
             .map_err(Error::Cmdline)?;
+
+        // Parse the CIDR string, and find the IP adrress and netmask.
+        if let Some(ip) = ip {
+            let cidr = ip.parse::<IpInet>().map_err(Error::InvalidCIDRAddress)?;
+            let ip_addr = cidr.address().to_string();
+            let netmask = cidr.mask().to_string();
+            println!("ip: {}, netmask: {}", ip_addr, netmask);
+            if let Some(gateway) = gateway {
+                let gateway = gateway
+                    .parse::<Ipv4Addr>()
+                    .map_err(Error::InvalidIPAddress)?;
+                self.cmdline
+                    .insert_str(format!("ip={}::{}:{}::eth0:off", ip_addr, gateway, netmask))
+                    .map_err(Error::Cmdline)?;
+            } else {
+                self.cmdline
+                    .insert_str(format!("ip={}:::{}::eth0:off", ip_addr, netmask))
+                    .map_err(Error::Cmdline)?;
+            }
+        }
 
         Ok(())
     }
@@ -508,12 +539,14 @@ impl VMM {
         if_name: Option<String>,
         socket_path: Option<String>,
         no_console: bool,
+        ip: Option<String>,
+        gateway: Option<String>,
     ) -> Result<()> {
         self.configure_console(console, socket_path, no_console)?;
         self.configure_memory(mem_size_mb)?;
         self.load_default_cmdline()?;
 
-        self.configure_net(if_name)?;
+        self.configure_net(if_name, ip, gateway)?;
 
         let kernel_load = kernel::kernel_setup(
             &self.guest_memory,

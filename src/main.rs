@@ -34,6 +34,14 @@ struct VMMOpts {
     #[clap(long)]
     net: Option<String>,
 
+    /// Guest IP address with CIDR
+    #[clap(long)]
+    ip: Option<String>,
+
+    // Default gateway
+    #[clap(long)]
+    gateway: Option<String>,
+
     /// no-console
     #[clap(long)]
     no_console: bool,
@@ -96,6 +104,8 @@ fn main() -> Result<(), Error> {
         opts.net,
         opts.socket,
         opts.no_console,
+        opts.ip,
+        opts.gateway,
     )
     .map_err(Error::VmmConfigure)?;
 
