@@ -12,6 +12,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
+use log::{debug, error, warn};
 use virtio_device::{VirtioConfig, VirtioDeviceActions, VirtioDeviceType, VirtioMmioDevice};
 
 use virtio_bindings::bindings::virtio_net::{
@@ -140,7 +141,7 @@ impl<M: GuestAddressSpace + Clone + Send, I: Interface> VirtioNet<M, I> {
 
         if count != buffer.len() {
             // The frame was too large for the chain.
-            println!("rx frame too large");
+            warn!("rx frame too large");
         }
 
         self.device_config.queues[0]
@@ -185,7 +186,7 @@ impl<M: GuestAddressSpace + Clone + Send, I: Interface> VirtioNet<M, I> {
 
             // Error should be recoverable as is, so we just log it.
             self.guest_irq_fd.write(1).unwrap_or_else(|e| {
-                println!("Failed to signal irq: {:?}", e);
+                warn!("Failed to signal irq: {:?}", e);
             });
         }
 
@@ -221,7 +222,7 @@ impl<M: GuestAddressSpace + Clone + Send, I: Interface> VirtioMmioDevice for Vir
             match queue.disable_notification(&*mem) {
                 Ok(_) => {}
                 Err(e) => {
-                    println!("Failed to disable notification: {:?}", e);
+                    error!("Failed to disable notification: {:?}", e);
                     break;
                 }
             }
@@ -242,7 +243,7 @@ impl<M: GuestAddressSpace + Clone + Send, I: Interface> VirtioMmioDevice for Vir
                 });
 
                 if (data_buffer.len() as usize) < bindings::VIRTIO_HDR_LEN {
-                    println!("invalid net packet");
+                    error!("invalid net packet");
                     return;
                 }
 
@@ -252,17 +253,17 @@ impl<M: GuestAddressSpace + Clone + Send, I: Interface> VirtioMmioDevice for Vir
                             .add_used(&*mem, chain.head_index(), 0x100)
                             // Try continuing even if we failed to add the used buffer.
                             .unwrap_or_else(|e| {
-                                println!("Failed to add used buffer: {:?}", e);
+                                error!("Failed to add used buffer: {:?}", e);
                             });
 
                         if queue.needs_notification(&*mem).unwrap_or_default() {
                             irq.write(1).unwrap_or_else(|e| {
-                                println!("Failed to signal irq: {:?}", e);
+                                error!("Failed to signal irq: {:?}", e);
                             });
                         }
                     }
                     Err(e) => {
-                        println!("Failed to write to tap: {:?}", e);
+                        error!("Failed to write to tap: {:?}", e);
                     }
                 }
             }
@@ -300,7 +301,7 @@ impl<M: GuestAddressSpace + Clone + Send, I: Interface> VirtioDeviceActions for 
         Ok(())
     }
     fn reset(&mut self) -> std::result::Result<(), Self::E> {
-        println!("virtio net reset");
+        debug!("virtio net reset");
         Ok(())
     }
 }

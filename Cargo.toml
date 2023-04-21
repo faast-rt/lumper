@@ -6,3 +6,5 @@ edition = "2021"
 [dependencies]
 clap = {version = "4.1.4", features = ["derive"]}
 vmm = { path = "src/vmm" }
+log = "0.4.17"
+env_logger = "0.10.0"

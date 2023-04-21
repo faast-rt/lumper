@@ -9,6 +9,7 @@ use std::{result, u64};
 
 use kvm_bindings::{kvm_fpu, kvm_regs, CpuId};
 use kvm_ioctls::{VcpuExit, VcpuFd, VmFd};
+use log::{debug, error, warn};
 use vm_device::device_manager::{IoManager, MmioManager};
 use vm_memory::{Address, Bytes, GuestAddress, GuestMemoryError, GuestMemoryMmap};
 
@@ -235,7 +236,7 @@ impl Vcpu {
                 Ok(exit_reason) => match exit_reason {
                     // The VM stopped (Shutdown ot HLT).
                     VcpuExit::Shutdown | VcpuExit::Hlt => {
-                        println!("Guest shutdown: {:?}. Bye!", exit_reason);
+                        debug!("Receive guest shutdown (code: {:?}) from vcpu", exit_reason);
                         unix_socket.write_all(b"1").unwrap();
                         break;
                     }
@@ -257,7 +258,7 @@ impl Vcpu {
                                 .unwrap();
                         }
                         _ => {
-                            println!("Unsupported device write at {:x?}", addr);
+                            warn!("Unsupported device write at {:x?}", addr);
                         }
                     },
 
@@ -273,12 +274,12 @@ impl Vcpu {
                         }
                         0x64 => {
                             //handle unsupported shutdown
-                            println!("Guest shutdown. Bye!");
+                            debug!("Receive guest shutdown from vcpu");
                             unix_socket.write_all(b"1").unwrap();
                             break;
                         }
                         _ => {
-                            println!("Unsupported device read at {:x?}", addr);
+                            warn!("Unsupported device read at {:x?}", addr);
                         }
                     },
 
@@ -303,11 +304,11 @@ impl Vcpu {
                     }
 
                     _ => {
-                        eprintln!("Unhandled VM-Exit: {:?}", exit_reason);
+                        warn!("Unhandled VM-Exit: {:?}", exit_reason);
                     }
                 },
 
-                Err(e) => eprintln!("Emulation error: {}", e),
+                Err(e) => error!("Emulation error: {}", e),
             }
         }
     }

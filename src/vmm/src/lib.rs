@@ -27,6 +27,7 @@ use devices::Writer;
 use kvm_bindings::{kvm_userspace_memory_region, KVM_MAX_CPUID_ENTRIES};
 use kvm_ioctls::{Kvm, VmFd};
 use linux_loader::loader::{self, KernelLoaderResult};
+use log::{debug, error, info};
 use vm_device::device_manager::IoManager;
 use vm_device::resources::Resource;
 use vm_memory::{Address, GuestAddress, GuestMemory, GuestMemoryMmap, GuestMemoryRegion};
@@ -241,12 +242,17 @@ impl VMM {
             .add_virtio_mmio_device(0x1000, virtio_address, 5, None)
             .map_err(Error::Cmdline)?;
 
-        // Parse the CIDR string, and find the IP adrress and netmask.
+        // Parse the CIDR string, and find the IP address and netmask.
         if let Some(ip) = ip {
             let cidr = ip.parse::<IpInet>().map_err(Error::InvalidCIDRAddress)?;
             let ip_addr = cidr.address().to_string();
             let netmask = cidr.mask().to_string();
-            println!("ip: {}, netmask: {}", ip_addr, netmask);
+
+            debug!(
+                "Parsed network configuration (ip: {}, netmask: {})",
+                ip_addr, netmask
+            );
+
             if let Some(gateway) = gateway {
                 let gateway = gateway
                     .parse::<Ipv4Addr>()
@@ -389,6 +395,8 @@ impl VMM {
 
     // Run all virtual CPUs.
     pub fn run(&mut self, no_console: bool) -> Result<()> {
+        info!("Starting guest ...");
+
         let mut unix_socket_name = String::from("/tmp/vmm.sock");
         while Path::new(&unix_socket_name).exists() {
             let rng = rand::rand_alphanumerics(8);
@@ -408,7 +416,7 @@ impl VMM {
             match handler {
                 Ok(handler) => handlers.push(handler),
                 Err(_) => {
-                    println!("Failed to start vCPU");
+                    error!("Failed to start vCPU");
                     return Err(Error::AccessThreadHandlerError);
                 }
             }
@@ -518,7 +526,7 @@ impl VMM {
                 }
 
                 if connections.iter().any(|c| c.as_raw_fd() == event_data) {
-                    println!("Shutting down");
+                    info!("Guest shutting down");
                     handlers.iter().for_each(|handler| {
                         let thread = handler.thread();
                         std::thread::Thread::unpark(thread);
@@ -542,6 +550,18 @@ impl VMM {
         ip: Option<String>,
         gateway: Option<String>,
     ) -> Result<()> {
+        debug!("Configuring guest with options: ");
+        debug!("\tNumber of vCPUs: {}", num_vcpus);
+        debug!("\tMemory size (MB): {}", mem_size_mb);
+        debug!("\tKernel path: {}", kernel_path);
+        debug!("\tInitramfs path: {:?}", initramfs_path);
+        debug!("\tConsole: {:?}", console);
+        debug!("\tNetwork interface: {:?}", if_name);
+        debug!("\tSocket path: {:?}", socket_path);
+        debug!("\tNo console: {}", no_console);
+        debug!("\tIP: {:?}", ip);
+        debug!("\tGateway: {:?}", gateway);
+
         self.configure_console(console, socket_path, no_console)?;
         self.configure_memory(mem_size_mb)?;
         self.load_default_cmdline()?;

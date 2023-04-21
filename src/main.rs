@@ -1,9 +1,10 @@
 use std::{io::Read, os::unix::net::UnixListener, path::Path, u32};
 
 use clap::Parser;
+use log::{debug, error, info};
 use vmm::VMM;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[clap(version = "0.1", author = "Polytech Montpellier - DevOps")]
 struct VMMOpts {
     /// Linux kernel path
@@ -61,10 +62,17 @@ pub enum Error {
 }
 
 fn main() -> Result<(), Error> {
+    env_logger::init();
+
+    if std::env::var("RUST_LOG").is_err() {
+        // If not, set it to "info" by default
+        std::env::set_var("RUST_LOG", "info");
+    }
+
     let opts: VMMOpts = VMMOpts::parse();
 
     if opts.console.is_some() && opts.socket.is_some() {
-        println!("You can't use --console and --socket at the same time");
+        error!("You can't use --console and --socket at the same time");
         return Ok(());
     }
 
@@ -82,13 +90,15 @@ fn main() -> Result<(), Error> {
                     break;
                 }
                 let s = String::from_utf8_lossy(&buffer[0..n]).to_string();
-                print!("{}", s);
+                info!("{}", s);
             }
         });
     }
 
     // Create a new VMM
     let mut vmm = VMM::new().map_err(Error::VmmNew)?;
+
+    debug!("Configure VMM with {:?}", opts);
 
     // Configure the VMM:
     // * Number of virtual CPUs
@@ -108,6 +118,8 @@ fn main() -> Result<(), Error> {
         opts.gateway,
     )
     .map_err(Error::VmmConfigure)?;
+
+    info!("Starting VMM ...");
 
     // Run the VMM
     vmm.run(opts.no_console).map_err(Error::VmmRun)?;
