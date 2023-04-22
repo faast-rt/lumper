@@ -12,7 +12,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use log::{debug, error, warn};
+use log::{debug, error, trace, warn};
 use virtio_device::{VirtioConfig, VirtioDeviceActions, VirtioDeviceType, VirtioMmioDevice};
 
 use virtio_bindings::bindings::virtio_net::{
@@ -152,9 +152,12 @@ impl<M: GuestAddressSpace + Clone + Send, I: Interface> VirtioNet<M, I> {
     }
 
     pub fn process_tap(&mut self) -> Result<()> {
+        if !self.device_config.queues[0].ready() {
+            trace!("Trying to write to net while queue is not ready");
+            return Ok(());
+        }
         {
             let buffer = &mut [0u8; MAX_BUFFER_SIZE];
-
             loop {
                 let read_size = match self.interface.read(buffer) {
                     Ok(size) => size,
