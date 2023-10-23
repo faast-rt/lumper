@@ -2,6 +2,67 @@
 
 #![cfg(target_arch = "x86_64")]
 
+//! # Lumper
+//!
+//! Virtual Machine Manager optimized for running MicroVMs on x86_64.
+//!
+//! ## Basic usage
+//! ```rust,no_run
+//! # fn run() -> Result<(), lumper::Error> {
+//! use lumper::VMM;
+//!
+//! // Create a new VMM
+//! let mut vmm = VMM::new()?;
+//!
+//! let no_console = false;
+//!
+//! // Configure the VMM
+//! vmm.configure(
+//!     2, // Number of vCPUs
+//!     2048, // Memory size in MB
+//!     "/opt/linux/arch/x86/boot/vmlinux.bin", // Path to compiled kernel binary
+//!     Some("/path/to/console".to_string()), // Redirect standard output to a file
+//!     Some("/path/to/initramfs".to_string()), // Path to initramfs (optional)
+//!     Some("tap1".to_string()), // Network interface name (optional)
+//!     None, // Output to an Unix socket (optional), cannot be used with the file output
+//!     no_console, // Enable this when you don't want the VMM to read from stdin
+//!     Some("10.0.50.2/16".to_string()), // Set the IP address with CIDR of the guest (when you use a network interface)
+//!     Some("10.0.50.2".to_string()), // Set the gateway IP address (when you use a network interface)
+//! )?;
+//!
+//! // Run the VMM
+//! vmm.run(no_console)?;
+//! # Ok(())
+//! # }
+//! ```
+//! ## Network configuration
+//!
+//! Root privileges are required to run the VMM with a network interface.
+//!
+//! To configure a network connection between the host and the guest. You need to create a bridge on the host:
+//!
+//! ```bash
+//! brctl addbr virtdo
+//! ip addr add 10.0.50.1/16 dev virtdo
+//! ```
+//!
+//! The VMM will create a TAP interface with the name you passed in `if_name` to the [`configure`](VMM::configure) function. You need to add this interface to the bridge on the host and bring it up:
+//!
+//! ```bash
+//! brctl addif virtdo tap1
+//! ip link set up virtdo
+//! ip link set up tap1
+//! ```
+//!
+//! If you didn't set the `ip` parameter, you will need to manually bring up the interface on the guest and set the IP address:
+//!
+//! ```bash
+//! ip link set up eth0
+//! ip addr add 10.0.50.2/16 dev eth0
+//! ```
+//!
+//!
+
 extern crate libc;
 
 extern crate linux_loader;
@@ -106,6 +167,9 @@ pub enum Error {
 /// Dedicated [`Result`](https://doc.rust-lang.org/std/result/) type.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// The structure representing the VMM and holdin the configuration.
+/// 
+/// See the [basic usage](index.html#basic-usage) example.
 pub struct VMM {
     vm_fd: VmFd,
     kvm: Kvm,
@@ -123,7 +187,9 @@ pub struct VMM {
 }
 
 impl VMM {
-    /// Create a new VMM.
+    /// Create a new VMM with default values.
+    ///
+    /// You will need to call [`configure`](VMM::configure) to configure the VMM.
     pub fn new() -> Result<Self> {
         // Open /dev/kvm and get a file descriptor to it.
         let kvm = Kvm::new().map_err(Error::KvmIoctl)?;
@@ -154,6 +220,9 @@ impl VMM {
         Ok(vmm)
     }
 
+    /// Configure the size of the memory available to the guest in MB.
+    ///
+    /// It is recommended to configure the VMM with the [`configure`](VMM::configure) function.
     pub fn configure_memory(&mut self, mem_size_mb: u32) -> Result<()> {
         // Convert memory size from MBytes to bytes.
         let mem_size = ((mem_size_mb as u64) << 20) as usize;
@@ -187,12 +256,18 @@ impl VMM {
         Ok(())
     }
 
+    /// Set the command line to a default value.
+    ///
+    /// It is recommended to configure the VMM with the [`configure`](VMM::configure) function.
     pub fn load_default_cmdline(&mut self) -> Result<()> {
         self.cmdline
             .insert_str(kernel::DEFAULT_CMDLINE)
             .map_err(Error::Cmdline)
     }
-    // configure the virtio-net device
+    /// Configure the virtio-net device.
+    /// If `interface` is `None`, no virtio-net device will be configured.
+    ///
+    /// It is recommended to configure the VMM with the [`configure`](VMM::configure) function.
     pub fn configure_net(
         &mut self,
         interface: Option<String>,
@@ -270,6 +345,10 @@ impl VMM {
         Ok(())
     }
 
+    /// Configure the IOAPIC, IO devices, and local APICs.
+    /// You need to call this function AFTER having configured the network interface and the console.
+    ///
+    /// It is recommended to configure the VMM with the [`configure`](VMM::configure) function.
     pub fn configure_io(&mut self) -> Result<()> {
         // First, create the irqchip.
         // On `x86_64`, this _must_ be created _before_ the vCPUs.
@@ -306,6 +385,10 @@ impl VMM {
         Ok(())
     }
 
+    /// Configure the console.
+    /// The `no_console` argument must match the `no_console` argument in [`run`](VMM::run).
+    ///
+    /// It is recommended to configure the VMM with the [`configure`](VMM::configure) function.
     pub fn configure_console(
         &mut self,
         console_path: Option<String>,
@@ -342,6 +425,10 @@ impl VMM {
         Ok(())
     }
 
+    /// Configure the vCPUs and load the kernel. Use [linux_loader](linux_loader) to load the kernel.
+    /// This function must be called AFTER having configured the memory and is usually called last in the configuration process.
+    ///
+    /// It is recommended to configure the VMM with the [`configure`](VMM::configure) function.
     pub fn configure_vcpus(
         &mut self,
         num_vcpus: u8,
@@ -393,7 +480,7 @@ impl VMM {
         Ok(())
     }
 
-    // Run all virtual CPUs.
+    /// Run all virtual CPUs. This will start the guest.
     pub fn run(&mut self, no_console: bool) -> Result<()> {
         info!("Starting guest ...");
 
@@ -537,6 +624,24 @@ impl VMM {
         }
     }
 
+    /// Configure all the aspects of the VMM.
+    /// This is the recommended way to configure the VMM.
+    ///
+    /// See the [basic usage](index.html#basic-usage) example.
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `num_vcpus` - Number of vCPUs.
+    /// * `mem_size_mb` - Memory size in MB.
+    /// * `kernel_path` - Path to the compiled kernel binary (`arch/x86/boot/vmlinux.bin`).
+    /// * `console` - Redirect standard output to a file (optional).
+    /// * `initramfs_path` - Path to initramfs (optional).
+    /// * `if_name` - Network tap interface name (optional). If this is `None`, localhost will be the only interface on the guest.
+    /// * `socket_path` - Output to an Unix socket (optional), cannot be used with the file output.
+    /// * `no_console` - Enable this when you don't want the VMM to read from stdin. This should be the same value as the `no_console` argument in [`run`](VMM::run).
+    /// * `ip` - Set the IP address with CIDR of the guest (optional, when you use a network interface).
+    /// * `gateway` - Set the gateway IP address (optional, when you use a network interface).
     pub fn configure(
         &mut self,
         num_vcpus: u8,
