@@ -6,13 +6,16 @@ use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::result;
 
+/// Maximum number of events that can be stored in the buffer, this may need to be moved elsewhere.
 pub(crate) const EPOLL_EVENTS_LEN: usize = 10;
 
+/// This is a simple wrapper around epoll to make adding new file descriptors easier.
 pub struct EpollContext {
     raw_fd: RawFd,
 }
 
 impl EpollContext {
+    /// Create a new epoll context (epoll file descriptor)
     pub fn new() -> result::Result<EpollContext, io::Error> {
         let raw_fd = epoll::create(true)?;
         Ok(EpollContext { raw_fd })
@@ -41,6 +44,7 @@ impl EpollContext {
 }
 
 impl AsRawFd for EpollContext {
+    /// Get the raw file descriptor of the epoll context
     fn as_raw_fd(&self) -> RawFd {
         self.raw_fd
     }

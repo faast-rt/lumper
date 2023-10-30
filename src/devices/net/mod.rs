@@ -59,6 +59,14 @@ impl Display for VirtioNetError {
 
 pub type Result<T> = std::result::Result<T, VirtioNetError>;
 
+/// Virtio network device.
+/// This device is a virtio network device that uses a tap device as backend.
+/// It is based on the virtio specification and virtio-memio.
+/// The device is split into two parts:
+/// - The device itself, which is the virtio device.
+/// - The interface, which is the tap device.
+/// The device is responsible for handling the virtio part of the device, while the interface is
+/// responsible for handling the tap part of the device.
 pub struct VirtioNet<M: GuestAddressSpace + Clone + Send, I: Interface> {
     pub device_config: VirtioConfig<Queue>,
     pub guest_irq_fd: EventFd,

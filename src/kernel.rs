@@ -12,7 +12,7 @@ use vm_memory::{Address, Bytes, GuestAddress, GuestMemory, GuestMemoryMmap};
 
 use crate::{Error, Result};
 
-/// x86_64 boot constants. See https://www.kernel.org/doc/Documentation/x86/boot.txt for the full
+/// x86_64 boot constants. See <https://www.kernel.org/doc/Documentation/x86/boot.txt> for the full
 /// documentation.
 /// Header field: `boot_flag`. Must contain 0xaa55. This is the closest thing old Linux kernels
 /// have to a magic number.
@@ -27,7 +27,7 @@ const KERNEL_MIN_ALIGNMENT_BYTES: u32 = 0x0100_0000;
 
 /// Start address for the EBDA (Extended Bios Data Area). Older computers (like the one this VMM
 /// emulates) typically use 1 KiB for the EBDA, starting at 0x9fc00.
-/// See https://wiki.osdev.org/Memory_Map_(x86) for more information.
+/// See <https://wiki.osdev.org/Memory_Map_(x86)> for more information.
 const EBDA_START: u64 = 0x0009_fc00;
 /// RAM memory type.
 const E820_RAM: u32 = 1;

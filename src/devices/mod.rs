@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 pub(crate) mod net;
 pub(crate) mod serial;
 
+/// Simple wrapper to allow an [`UnixStream`](UnixStream) to be used as a Writer.
 pub struct Writer {
     unix_stream: Arc<Mutex<UnixStream>>,
 }
