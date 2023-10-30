@@ -12,26 +12,24 @@ use vm_memory::{Address, Bytes, GuestAddress, GuestMemory, GuestMemoryMmap};
 
 use crate::{Error, Result};
 
-// x86_64 boot constants. See https://www.kernel.org/doc/Documentation/x86/boot.txt for the full
-// documentation.
-// Header field: `boot_flag`. Must contain 0xaa55. This is the closest thing old Linux kernels
-// have to a magic number.
+/// x86_64 boot constants. See https://www.kernel.org/doc/Documentation/x86/boot.txt for the full
+/// documentation.
+/// Header field: `boot_flag`. Must contain 0xaa55. This is the closest thing old Linux kernels
+/// have to a magic number.
 const KERNEL_BOOT_FLAG_MAGIC: u16 = 0xaa55;
-// Header field: `header`. Must contain the magic number `HdrS` (0x5372_6448).
+/// Header field: `header`. Must contain the magic number `HdrS` (0x5372_6448).
 const KERNEL_HDR_MAGIC: u32 = 0x5372_6448;
-// Header field: `type_of_loader`. Unless using a pre-registered bootloader (which we aren't), this
-// field must be set to 0xff.
+/// Header field: `type_of_loader`. Unless using a pre-registered bootloader (which we aren't), this
+/// field must be set to 0xff.
 const KERNEL_LOADER_OTHER: u8 = 0xff;
-// Header field: `kernel_alignment`. Alignment unit required by a relocatable kernel.
+/// Header field: `kernel_alignment`. Alignment unit required by a relocatable kernel.
 const KERNEL_MIN_ALIGNMENT_BYTES: u32 = 0x0100_0000;
 
-// Start address for the EBDA (Extended Bios Data Area). Older computers (like the one this VMM
-// emulates) typically use 1 KiB for the EBDA, starting at 0x9fc00.
-// See https://wiki.osdev.org/Memory_Map_(x86) for more information.
+/// Start address for the EBDA (Extended Bios Data Area). Older computers (like the one this VMM
+/// emulates) typically use 1 KiB for the EBDA, starting at 0x9fc00.
+/// See https://wiki.osdev.org/Memory_Map_(x86) for more information.
 const EBDA_START: u64 = 0x0009_fc00;
-// RAM memory type.
-// TODO: this should be bindgen'ed and exported by linux-loader.
-// See https://github.com/rust-vmm/linux-loader/issues/51
+/// RAM memory type.
 const E820_RAM: u32 = 1;
 
 /// Address of the zeropage, where Linux kernel boot parameters are written.
@@ -41,9 +39,10 @@ const HIMEM_START: u64 = 0x0010_0000; // 1 MB
 
 /// Address where the kernel command line is written.
 const CMDLINE_START: u64 = 0x0002_0000;
-// Default command line
+/// Default command line
 pub const DEFAULT_CMDLINE: &str = "i8042.nokbd reboot=k panic=1 pci=off";
 
+/// Add a new memory map entry to the e820 table.
 fn add_e820_entry(
     params: &mut boot_params,
     addr: u64,
@@ -68,8 +67,6 @@ fn add_e820_entry(
 ///
 /// * `guest_memory` - guest memory
 /// * `himem_start` - address where high memory starts.
-/// * `mmio_gap_start` - address where the MMIO gap starts.
-/// * `mmio_gap_end` - address where the MMIO gap ends.
 pub fn build_bootparams(
     guest_memory: &GuestMemoryMmap,
     himem_start: GuestAddress,
@@ -98,12 +95,16 @@ pub fn build_bootparams(
     Ok(params)
 }
 
-/// Set guest kernel up.
+/// Set guest kernel up in the memory.
+/// This loads the kernel and initramfs into guest memory and configures the boot parameters.
+/// Returns the address where the kernel was loaded : [`KernelLoaderResult`](KernelLoaderResult).
 ///
 /// # Arguments
 ///
-/// * `kernel_cfg` - [`KernelConfig`](struct.KernelConfig.html) struct containing kernel
-///                  configurations.
+/// * `guest_memory` - Guest memory map
+/// * `kernel_path` - Path to the kernel image
+/// * `initramfs_path` - Path to the initramfs image to load into guest memory
+/// * `cmdline` - Kernel command line, use [`DEFAULT_CMDLINE`](DEFAULT_CMDLINE) as a default
 pub fn kernel_setup(
     guest_memory: &GuestMemoryMmap,
     kernel_path: PathBuf,
@@ -138,7 +139,6 @@ pub fn kernel_setup(
     bootparams.hdr.cmdline_size = cmdline_size + 1;
 
     // Shrink the command line to the actual size.
-
     let mut shrinked_cmdline =
         linux_loader::cmdline::Cmdline::new(cmdline_size as usize + 1).map_err(Error::Cmdline)?;
     shrinked_cmdline
