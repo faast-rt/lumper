@@ -36,6 +36,8 @@ impl EventFdTrigger {
     }
 }
 
+/// Wrapper around [`Serial`](vm_superio::Serial) that also contains an [`EventFdTrigger`](EventFdTrigger).
+/// This makes it easier to pass around the serial device.
 pub(crate) struct LumperSerial {
     // evenfd allows for the device to send interrupts to the guest.
     eventfd: EventFdTrigger,
@@ -54,6 +56,7 @@ impl LumperSerial {
         })
     }
 
+    /// Returns the [`EventFdTrigger`](EventFdTrigger) associated with this serial device.
     pub fn eventfd(&self) -> Result<EventFd> {
         Ok(self.eventfd.try_clone()?.0)
     }
