@@ -39,11 +39,11 @@ struct VMMOpts {
     #[clap(long)]
     ip: Option<String>,
 
-    // Default gateway
+    /// Default gateway
     #[clap(long)]
     gateway: Option<String>,
 
-    /// no-console
+    /// Disable console input
     #[clap(long)]
     no_console: bool,
 
@@ -54,28 +54,33 @@ struct VMMOpts {
 
 #[derive(Debug)]
 pub enum Error {
+    /// Error while creating the VMM
     VmmNew(lumper::Error),
 
+    /// Error while configuring the VMM
     VmmConfigure(lumper::Error),
 
+    /// Error while running the VMM
     VmmRun(lumper::Error),
 }
 
 fn main() -> Result<(), Error> {
-    env_logger::init();
+    // Log level to info by default
+    env_logger::Builder::new()
+        .filter_level(log::LevelFilter::Info)
+        .parse_default_env()
+        .init();
 
-    if std::env::var("RUST_LOG").is_err() {
-        // If not, set it to "info" by default
-        std::env::set_var("RUST_LOG", "info");
-    }
-
+    // Parse command line arguments
     let opts: VMMOpts = VMMOpts::parse();
 
+    // Check for conflicting options
     if opts.console.is_some() && opts.socket.is_some() {
         error!("You can't use --console and --socket at the same time");
         return Ok(());
     }
 
+    // Set up the socket if needed
     if let Some(socket) = opts.socket.as_ref() {
         let path = Path::new(socket.as_str());
         let unix_listener = UnixListener::bind(path).unwrap();
@@ -100,11 +105,17 @@ fn main() -> Result<(), Error> {
 
     debug!("Configure VMM with {:?}", opts);
 
-    // Configure the VMM:
-    // * Number of virtual CPUs
-    // * Memory size (in MB)
-    // * Path to a Linux kernel
-    // * Optional path to console file
+    // Configure the VMM
+    // * Number of CPUs
+    // * Memory size
+    // * Kernel path
+    // * Console path
+    // * Initramfs path
+    // * Network interface name
+    // * Unix socket path
+    // * Disable console input
+    // * Guest IP address
+    // * Guest default gateway
     vmm.configure(
         opts.cpus,
         opts.memory,
@@ -121,7 +132,7 @@ fn main() -> Result<(), Error> {
 
     info!("Starting VMM ...");
 
-    // Run the VMM
+    // Run the VMM, this will block until the VMM exits
     vmm.run(opts.no_console).map_err(Error::VmmRun)?;
 
     Ok(())
